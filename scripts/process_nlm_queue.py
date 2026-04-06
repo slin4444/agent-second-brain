@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, re, time, logging, asyncio
+import os, re, time, logging, asyncio, urllib.request, json
 from pathlib import Path
 from datetime import datetime
 
@@ -42,11 +42,31 @@ def format_obsidian_note(content: str, url: str) -> str:
             
     tags_yaml = "\n".join(f"  - {t}" for t in unique_tags)
     frontmatter = f"---\nsource: {url}\ntype: deep_analysis\ndate: {datetime.now().strftime('%Y-%m-%d')}\ntags:\n{tags_yaml}\n---\n\n"
-    return f"{frontmatter}# Анализ: {url}\n\n{content}"
+    return f"{frontmatter}{content}"
 
 def extract_url(content):
-    match = re.search(r'https?://[^\s]+', content)
-    return match.group(0) if match else None
+    urls = re.findall(r'https?://[^\s<>"\'\)\]]+', content)
+    for u in urls:
+        if "t.me" not in u:
+            return u
+    return None
+
+def get_youtube_title(url: str) -> str:
+    """Получает реальное название YouTube видео через oEmbed API."""
+    try:
+        api_url = f"https://www.youtube.com/oembed?url={url}&format=json"
+        with urllib.request.urlopen(api_url, timeout=10) as res:
+            data = json.loads(res.read().decode())
+            return data.get("title", "")
+    except Exception as e:
+        logger.warning(f"Не удалось получить заголовок YouTube: {e}")
+        return ""
+
+def make_safe_filename(title: str) -> str:
+    """Конвертирует заголовок в безопасное имя файла."""
+    safe = re.sub(r'[^\w\sа-яА-ЯёЁ-]', '', title).strip()
+    safe = re.sub(r'[-\s]+', '_', safe)[:80]
+    return safe or "youtube_note"
 
 async def process_queue():
     if not HAS_NLM:
@@ -80,17 +100,25 @@ async def process_queue():
                     os.replace(f, ERRORS_DIR / f.name)
                     continue
 
-                # 1. Создаем блокнот
-                title = f.stem.replace("_", " ")
-                nb = await nlm.notebooks.create(title=f"Ingest: {title}")
+                # 1. Получаем реальное название видео
+                yt_title = get_youtube_title(url)
+                if yt_title:
+                    logger.info(f"Название видео: {yt_title}")
+                    safe_name = make_safe_filename(yt_title)
+                else:
+                    safe_name = f.stem
+                date_prefix = datetime.now().strftime('%Y-%m-%d')
+                
+                # 2. Создаем блокнот с реальным названием
+                nb = await nlm.notebooks.create(title=yt_title or safe_name)
                 logger.info(f"Создан блокнот Google: {nb.id}")
                 
-                # 2. Добавляем источник
+                # 3. Добавляем источник
                 source = await nlm.sources.add_url(notebook_id=nb.id, url=url)
                 logger.info("Источник добавлен. Ждем завершения анализа...")
                 await nlm.sources.wait_until_ready(notebook_id=nb.id, source_id=source.id)
                 
-                # 3. Генерируем Study Guide (глубокий разбор)
+                # 4. Генерируем Study Guide (глубокий разбор)
                 logger.info("Генерация Study Guide (это занимает 1-2 минуты)...")
                 status = await nlm.artifacts.generate_study_guide(
                     notebook_id=nb.id, 
@@ -101,8 +129,8 @@ async def process_queue():
                 # Ожидаем готовности артефакта
                 await nlm.artifacts.wait_for_completion(notebook_id=nb.id, task_id=status.task_id)
                 
-                # 4. Скачиваем результат
-                output_file = TARGET_DIR / f"{f.stem}_detailed.md"
+                # 5. Скачиваем результат — имя файла из заголовка видео
+                output_file = TARGET_DIR / f"{date_prefix}_{safe_name}.md"
                 await nlm.artifacts.download_report(notebook_id=nb.id, output_path=str(output_file))
                 
                 # Форматируем и добавляем свойства YAML
