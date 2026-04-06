@@ -1,0 +1,13 @@
+[project]
+name = "second-brain"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "firecrawl-py>=4.22.0",
+    "python-dotenv>=1.2.2",
+    "requests>=2.33.1",
+    "youtube-transcript-api>=1.2.4",
+    "yt-dlp>=2026.3.17",
+]
