@@ -23,11 +23,18 @@ load_dotenv(dotenv_path=Path("/root/agent-second-brain/.env") if os.name != 'nt'
 
 VAULT_DIR = Path(os.environ.get("OBSIDIAN_VAULT_PATH", "/root/Second_Brain"))
 INBOX_DIR = VAULT_DIR / "01_Inbox" / "Telegram"
+WIKI_DIR = VAULT_DIR / "03_Knowledge_Base"
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 FIRECRAWL_API_KEY = os.environ.get("FIRECRAWL_API_KEY")
-PROXY_URL = os.getenv("TELEGRAM_PROXY_URL") # Используем тот же прокси, что и для Telegram
+PROXY_URL = os.getenv("TELEGRAM_PROXY_URL")
 
-ALLOWED_FOLDERS = ["03_Knowledge_Base/AI_Hub", "03_Knowledge_Base/Concepts", "03_Knowledge_Base/Sources", "04_Projects"]
+# Папки для распределения
+WIKI_PATHS = {
+    "source": WIKI_DIR / "sources",
+    "entity": WIKI_DIR / "entities",
+    "concept": WIKI_DIR / "concepts",
+    "analysis": WIKI_DIR / "analysis"
+}
 
 def get_yt_id(url):
     patterns = [r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', r'youtu\.be\/([0-9A-Za-z_-]{11})']
@@ -39,22 +46,16 @@ def get_yt_id(url):
 def get_yt_transcript(video_id):
     if not HAS_YT_API: return None
     try:
-        proxies = None
-        if PROXY_URL:
-            proxies = {"http": PROXY_URL, "https": PROXY_URL}
-        
-        # Исправленный вызов согласно dir(): list вместо list_transcripts
+        proxies = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
         transcript_list = YouTubeTranscriptApi.list(video_id, proxies=proxies)
         transcript = transcript_list.find_transcript(['ru', 'en'])
         return " ".join([t['text'] for t in transcript.fetch()])
     except Exception as e:
-        logger.warning(f"YT Transcript fall: {e}")
+        logger.warning(f"YT Transcript fail: {e}")
         return None
 
 def get_yt_oembed(url):
-    logger.info(f"--- YT OEMBED: {url} ---")
     try:
-        # oEmbed не требует авторизации и часто работает без прокси
         api_url = f"https://www.youtube.com/oembed?url={url}&format=json"
         with urllib.request.urlopen(api_url, timeout=10) as res:
             data = json.loads(res.read().decode())
@@ -65,66 +66,43 @@ def get_yt_oembed(url):
 
 def get_yt_metadata(url):
     if not HAS_YT_DLP: return None
-    logger.info(f"--- YT-DLP METADATA: {url} ---")
-    
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'extract_flat': True,
-        'skip_download': True,
-    }
-    if PROXY_URL:
-        ydl_opts['proxy'] = PROXY_URL
-        
+    ydl_opts = {'quiet': True, 'no_warnings': True, 'extract_flat': True, 'skip_download': True}
+    if PROXY_URL: ydl_opts['proxy'] = PROXY_URL
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            title = info.get('title', 'Unknown Title')
-            description = info.get('description', 'No description available')
-            return f"TITLE: {title}\nDESCRIPTION: {description}"
-    except Exception as e:
-        logger.error(f"YT-DLP error: {e}")
-        return None
+            return f"TITLE: {info.get('title', 'Unknown')}\nDESCRIPTION: {info.get('description', '')}"
+    except: return None
 
 def scrape_url(url):
-    # Пытаемся сначала через YouTube API
     yt_id = get_yt_id(url)
     if yt_id:
-        # Каскад: Транскрипт -> oEmbed -> yt-dlp
         transcript = get_yt_transcript(yt_id)
-        if transcript:
-            logger.info(f"--- YT-API УСПЕХ: {yt_id} ---")
-            return f"[YouTube Transcript]\n{transcript[:15000]}"
-        
+        if transcript: return True, f"[YouTube Transcript]\n{transcript[:15000]}"
         oembed = get_yt_oembed(url)
-        if oembed:
-             return f"[YouTube oEmbed Metadata]\n{oembed}"
-        
-        # Если даже oEmbed не сработал (редко), пробуем yt-dlp
+        if oembed: return True, f"[YouTube oEmbed Metadata]\n{oembed}"
         metadata = get_yt_metadata(url)
-        if metadata:
-            return f"[YouTube Metadata (yt-dlp)]\n{metadata}"
+        if metadata: return True, f"[YouTube Metadata (yt-dlp)]\n{metadata}"
 
-    # Если не YouTube или API не сработало — используем Firecrawl
-    if not FIRECRAWL_API_KEY: return "No Firecrawl key"
-    if yt_id:
-         # Для YouTube ссылок Firecrawl часто выдает 408/403, если основной метод провалился, 
-         # скорее всего и тут будет ошибка, но попробуем.
-         logger.info(f"--- FIRECRAWL (Fallback for YT): {url} ---")
-    else:
-         logger.info(f"--- FIRECRAWL СКРАПИНГ: {url} ---")
-         
+    if not FIRECRAWL_API_KEY: return False, "No Firecrawl key"
     try:
         data = json.dumps({"url": url, "formats": ["markdown"], "onlyMainContent": True}).encode()
         req = urllib.request.Request("https://api.firecrawl.dev/v1/scrape", data=data, 
                                      headers={"Authorization": f"Bearer {FIRECRAWL_API_KEY}", "Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=60) as res:
+        # Увеличен таймаут до 90 секунд для стабильности
+        with urllib.request.urlopen(req, timeout=90) as res:
             text = json.loads(res.read().decode()).get("data", {}).get("markdown", "")
-            if not text: return "Scrape result is empty"
-            return text[:12000]
-    except Exception as e: 
-        logger.error(f"Scrape failed: {e}")
-        return f"ERROR_SCRAPING: {e}"
+            if not text: return False, "Empty content"
+            return True, text[:12000]
+    except Exception as e: return False, f"HTTP Error {e}"
+
+def read_wiki_context():
+    idx = WIKI_DIR / "index.md"
+    hot = WIKI_DIR / "hot.md"
+    ctx = ""
+    if idx.exists(): ctx += f"--- CURRENT INDEX ---\n{idx.read_text(encoding='utf-8')[:3000]}\n"
+    if hot.exists(): ctx += f"--- HOT CACHE ---\n{hot.read_text(encoding='utf-8')[:1000]}\n"
+    return ctx
 
 def clean_json(text):
     text = re.sub(r'^```json\s*|\s*```$', '', text.strip(), flags=re.MULTILINE)
@@ -135,40 +113,68 @@ def clean_json(text):
         raise
 
 def process_file(path):
-    logger.info(f"=== ОБРАБОТКА: {path.name} ===")
+    logger.info(f"=== WIKI INGEST: {path.name} ===")
     raw_input = path.read_text(encoding="utf-8")
     urls = re.findall(r'https?://[^\s]+', raw_input)
-    scraped_content = scrape_url(urls[0]) if urls else ""
+    
+    success, scraped_content = (True, "")
+    if urls:
+        success, scraped_content = scrape_url(urls[0])
+    
+    context = read_wiki_context()
+    
+    # Режим обработки ошибок в промпте
+    error_instr = ""
+    if not success:
+        logger.warning(f"SCRAPE FAILED for {path.name}: {scraped_content}")
+        error_instr = f"\n!!! ВНИМАНИЕ: Контент по ссылке НЕ ПОЛУЧЕН (Ошибка: {scraped_content}). Создай КРАТКУЮ заметку-заглушку (Stub) только на основе текста пользователя. Поставь статус 'stub' в YAML.\n"
 
-    system_prompt = f"""Ты — Профессиональный PKM-Аналитик (Obsidian Specialist).
-Твоя задача: Создать глубокую, визуально богатую заметку.
+    system_prompt = f"""Ты — Expert LLM Wiki Maintainer (на основе паттерна Карпатого).
+Твоя задача: Разложить входящий контент на составляющие базы знаний.
 
-ИСПОЛЬЗУЙ СТАНДАРТЫ OBSIDIAN:
-- Callouts: > [!info], > [!important], > [!tip] для акцентов.
-- Highlights: ==термины== для выделения.
-- Фреймворк: STAR (Situation, Task, Action, Result) и R-I-S-E.
+ЯЗЫКОВАЯ ПОЛИТИКА:
+- ВСЕГДА создавай контент (content) на РУССКОМ языке, даже если источник на английском.
+- Имена файлов (path) оставляй на английском (snake_case).
 
-ОСОБЫЕ ИНСТРУКЦИИ:
-- Если контент содержит "ERROR_SCRAPING", НЕ АНАЛИЗИРУЙ ТЕКСТ ОШИБКИ. Вместо этого напиши, что данные не удалось извлечь, и оформи заметку на основе ссылки и доступных метаданных.
-- Если доступен только [YouTube oEmbed Metadata] или [YouTube Metadata (yt-dlp)], сделай резюме на основе заголовка и автора/описания видео. Сформулируй краткое содержание исходя из темы, указанной в заголовке.
+{error_instr}
+ИНСТРУКЦИИ:
+1. Изучи ТЕКУЩИЙ ИНДЕКС, чтобы найти существующие связи.
+2. Создай ОСНОВНУЮ заметку (Source) по стандартам STAR/RISE.
+3. Выдели СУЩНОСТИ (Инструменты, Люди) и КОНЦЕПЦИИ (Технологии, Идеи).
+4. Если сущность/концепция уже есть в индексе — предложи ОБНОВЛЕНИЕ файла. Если нет — предложи СОЗДАНИЕ.
+5. Обнови INDEX и LOG.
 
-Верни JSON:
-- meta_title (RU)
-- meta_source (URL)
-- meta_description (1 sentence)
-- meta_tags (list)
-- content_summary (используй highlights)
-- content_star (STAR блок с использованием callouts)
-- content_insights (список инсайтов)
-- official_description (метаданные/описание из скрапинга)
-- target_folder (из {ALLOWED_FOLDERS})
-- filename (En_snake_case)"""
+ВЫХОДНЫЕ ДАННЫЕ (только JSON):
+{{
+  "actions": [
+    {{
+      "type": "create",
+      "path": "sources/filename.md",
+      "content": "Полный текст заметки по стандартам STAR/RISE/Callouts"
+    }},
+    {{
+      "type": "update_or_create",
+      "path": "entities/entity_name.md",
+      "content": "Краткое описание сущности со ссылкой на исходный source"
+    }},
+    {{
+      "type": "log",
+      "entry": "## [DATE] ingest | Title (Short desc)"
+    }},
+    {{
+      "type": "index_update",
+      "category": "Concepts|Entities|Sources",
+      "line": "- [[Link]] | Краткое описание"
+    }}
+  ],
+  "hot_cache_update": "Кратчайшая выжимка (50 слов) для hot.md"
+}}"""
 
     payload = {
         "model": "deepseek/deepseek-chat",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"ВВОДНЫЕ:\n{raw_input}\n\nКОНТЕНТ:\n{scraped_content}"}
+            {"role": "user", "content": f"WIKI CONTEXT:\n{context}\n\nINPUT:\n{raw_input}\n\nCONTENT:\n{scraped_content}"}
         ],
         "response_format": {"type": "json_object"}
     }
@@ -179,43 +185,53 @@ def process_file(path):
         with urllib.request.urlopen(req, timeout=120) as response:
             res = clean_json(json.loads(response.read().decode())["choices"][0]["message"]["content"])
             
-            tags_list = "\n".join([f"  - {t}" for t in res.get("meta_tags", ["brain"])])
-            
-            final_note = f"""---
-date: {datetime.now().strftime('%Y-%m-%d')}
-source: "{res.get('meta_source', '')}"
-tags:
-{tags_list}
-status: processed
-description: "{res.get('meta_description', '').replace('"', "'")}"
----
+            # Обработка действий
+            for action in res.get("actions", []):
+                a_type = action.get("type")
+                if a_type in ["create", "update_or_create"]:
+                    p = WIKI_DIR / action.get("path")
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    if a_type == "update_or_create" and p.exists():
+                        old_content = p.read_text(encoding="utf-8")
+                        new_content = old_content + "\n\n### Update " + datetime.now().strftime('%Y-%m-%d') + "\n" + action.get("content")
+                        p.write_text(new_content, encoding="utf-8")
+                    else:
+                        p.write_text(action.get("content"), encoding="utf-8")
+                
+                elif a_type == "log":
+                    lp = WIKI_DIR / "log.md"
+                    entry = action.get("entry").replace("[DATE]", datetime.now().strftime('%Y-%m-%d'))
+                    if lp.exists():
+                        log_content = lp.read_text(encoding="utf-8")
+                        lp.write_text(log_content + "\n" + entry, encoding="utf-8")
 
-# {res.get('meta_title', 'Без названия')}
+                elif a_type == "index_update":
+                    ip = WIKI_DIR / "index.md"
+                    if ip.exists():
+                        idx_text = ip.read_text(encoding="utf-8")
+                        cat = action.get("category")
+                        line = action.get("line")
+                        # Гибкий поиск заголовка (игнорируем эмодзи и лишние пробелы)
+                        pattern = rf"(###\s*.*{cat}.*)"
+                        if re.search(pattern, idx_text) and line not in idx_text:
+                            idx_text = re.sub(pattern, rf"\1\n{line}", idx_text, count=1)
+                            ip.write_text(idx_text, encoding="utf-8")
 
-## 📝 Краткое Резюме
-{res.get('content_summary', '')}
+            # Обновление Hot Cache
+            hp = WIKI_DIR / "hot.md"
+            hot_text = res.get("hot_cache_update", "")
+            if hot_text:
+                hp.write_text(f"# 🔥 Hot Cache\n> Последнее обновление: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n{hot_text}", encoding="utf-8")
 
-## 🚀 Анализ STAR (Situation, Task, Action, Result)
-{res.get('content_star', '')}
-
-## 💡 Ключевые идеи и Инсайты
-{res.get('content_insights', '')}
-
-## 📋 Оригинальное Описание
-> [!info] Источник
-> {res.get('official_description', 'Детали извлечены из контента.')}
-
-## 🔗 Ресурсы
-- Оригинал: {res.get('meta_source', '')}
-"""
-            target = res.get("target_folder", "03_Knowledge_Base/Sources")
-            dest = VAULT_DIR / (target if target in ALLOWED_FOLDERS else "03_Knowledge_Base/Sources")
-            dest.mkdir(parents=True, exist_ok=True)
-            fname = re.sub(r'[^a-zA-Z0-9_]', '_', res.get("filename", "note")).strip("_") + ".md"
-            (dest / fname).write_text(final_note, encoding="utf-8")
-            path.unlink()
-            logger.info(f"=== УСПЕХ (PRO): {fname} ===")
-    except Exception as e: logger.error(f"Error: {e}")
+            # Логика очистки/карантина
+            if success:
+                path.unlink()
+                logger.info(f"=== SUCCESS (PRO): {res.get('actions', [{}])[0].get('path', 'unknown')} ===")
+            else:
+                err_path = INBOX_DIR.parent / "Errors" / path.name
+                path.replace(err_path)
+                logger.warning(f"=== MOVED TO ERRORS: {path.name} ===")
+    except Exception as e: logger.error(f"Wiki Ingest Error: {e}")
 
 if __name__ == "__main__":
     if INBOX_DIR.exists():

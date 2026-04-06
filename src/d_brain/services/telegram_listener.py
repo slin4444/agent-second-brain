@@ -111,26 +111,36 @@ class TelegramListener:
         entities = message.get("entities") or message.get("caption_entities") or []
         
         text = self.format_telegram_text(raw_text, entities)
+        
         # Умный поиск заголовка: берем первую строку
         lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
         display_title = lines[0] if lines else "Пост без названия"
         
-        # Очистка заголовка для имени файла
         import re
         safe_title = re.sub(r'[^\w\s-]', '', display_title).strip()
         safe_title = re.sub(r'[-\s]+', '_', safe_title)[:50]
-        
         filename = f"{safe_title or source_handle}.md"
-        file_path = self.output_dir / filename
+
+        # Детекция YouTube для NotebookLM
+        is_yt = any(domain in raw_text.lower() for domain in ["youtube.com", "youtu.be"])
+        target_dir = self.output_dir
+        tags = ["inbox", "telegram"]
         
+        if is_yt:
+            target_dir = self.output_dir.parent / "nLM_Queue"
+            tags.append("nlm_queue")
+            logger.info(f"Обнаружена YouTube ссылка, направляю в nLM_Queue: {filename}")
+
+        file_path = target_dir / filename
         link = f"https://t.me/{source_handle}/{msg_id}" if source_handle != "private" else ""
         
+        tags_str = ", ".join(tags)
         content = f"""---
 date: {date_str}
 source: telegram
 channel: "{source_title}"
 url: {link}
-tags: [inbox, telegram]
+tags: [{tags_str}]
 ---
 
 # {display_title}
