@@ -3,15 +3,19 @@ import os, re, time, logging, asyncio, urllib.request, json
 from pathlib import Path
 from datetime import datetime
 
+try:
+    from scripts.log_manager import setup_logger
+    logger = setup_logger("nLM-Orchestrator")
+except ImportError:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    logger = logging.getLogger("nLM-Orchestrator")
+
 # Попытка импорта библиотеки
 try:
     from notebooklm import NotebookLMClient
     HAS_NLM = True
 except ImportError:
     HAS_NLM = False
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("nLM-Orchestrator")
 
 # Пути
 VAULT_DIR = Path(os.environ.get("OBSIDIAN_VAULT_PATH", r"D:\Documents\Obsidian Vault\Second_Brain"))
