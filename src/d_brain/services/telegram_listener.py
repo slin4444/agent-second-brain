@@ -154,6 +154,16 @@ tags: [{tags_str}]
         try:
             file_path.write_text(content, encoding="utf-8")
             logger.info(f"Сохранено: {file_path}")
+            
+            # Отправляем подтверждение в Telegram
+            chat_id = message.get("chat", {}).get("id")
+            if chat_id:
+                dest = "nLM_Queue (авто-анализ видео)" if is_yt else "Inbox"
+                requests.post(
+                    f"{self.base_url}/sendMessage",
+                    json={"chat_id": chat_id, "text": f"✅ Заметка сохранена в {dest}!"},
+                    proxies=self.proxies
+                )
         except Exception as e:
             logger.error(f"Не удалось сохранить файл: {e}")
 
