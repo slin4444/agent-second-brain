@@ -131,6 +131,7 @@ class TelegramListener:
             tags.append("nlm_queue")
             logger.info(f"Обнаружена YouTube ссылка, направляю в nLM_Queue: {filename}")
 
+        target_dir.mkdir(parents=True, exist_ok=True)
         file_path = target_dir / filename
         link = f"https://t.me/{source_handle}/{msg_id}" if source_handle != "private" else ""
         

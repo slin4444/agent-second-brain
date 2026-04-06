@@ -115,6 +115,12 @@ def clean_json(text):
 def process_file(path):
     logger.info(f"=== WIKI INGEST: {path.name} ===")
     raw_input = path.read_text(encoding="utf-8")
+    
+    # NotebookLM handles YouTube links now
+    if any(domain in raw_input.lower() for domain in ["youtube.com", "youtu.be"]):
+        logger.info(f"Skipping {path.name}: YouTube link detected (routed to nLM Queue).")
+        return
+
     urls = re.findall(r'https?://[^\s]+', raw_input)
     
     success, scraped_content = (True, "")
