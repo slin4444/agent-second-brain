@@ -1,75 +1,74 @@
 # Long-term Memory
 
-Curated knowledge that persists across sessions. Part of the 3-layer memory architecture (hot context → searchable vault → archive). See `.claude/skills/agent-memory/SKILL.md` for details.
+Curated knowledge that persists across sessions.
 
 ## User Profile
 
 | Field | Value |
 |-------|-------|
-| Name | [Your name] |
-| Timezone | [Your timezone, e.g., UTC+5] |
-| Location | [City/Country] |
-| Primary language | [e.g., Russian/English] |
+| Язык общения | Русский |
+| Профессия | Разработка документов (ГОСТ, методики испытаний), проект ВСМ-1 |
+| Хобби | Изучение ИИ-инструментов для личной и рабочей эффективности |
+| Личные проекты | SEO, продвижение финсоветника, аудит бизнес-процессов (для друзей/родственников) |
+| Главный use case | Разобраться в своих мыслях и идеях |
 
 ## Preferences
 
 ### Tech Stack
-- Languages: [e.g., Python, TypeScript]
-- Frameworks: [e.g., React, FastAPI]
-- Tools: [e.g., Cursor, Claude Code]
+- ИИ: Claude (основной), OpenRouter API, NotebookLM
+- Инфраструктура: VPS (Ubuntu), S3, Obsidian, Telegram боты
+- Инструменты: Claude Code (cm команда на VPS), claude-claw бот
 
 ### Communication Style
-- Preferred response language: [Russian/English/Mixed]
-- Detail level: [Brief/Detailed]
-- Code comments: [Minimal/Verbose]
-
-### Habits
-- Morning routine: [if relevant]
-- Work hours: [e.g., 10:00-19:00]
-- Planning cadence: [weekly/daily]
+- Preferred response language: Русский
+- Detail level: Краткий, по делу
 
 ## Key Decisions
 
-| Date | Decision | Context |
-|------|----------|---------|
-| YYYY-MM-DD | Example: Use uv instead of pip | Better dependency management |
+| Дата | Решение | Контекст |
+|------|---------|---------|
+| 2026-04-07 | Переход на Writer Wiki модель | thoughts/ → wiki/ для накопления знаний |
+| 2026-04-07 | Query через claude-claw | Не разрабатывать /wiki в capture боте |
+| 2026-04-07 | Оставить S3 (не переходить на GitHub) | Вложения, двусторонняя sync |
 
 ## Active Context
 
-### ONE Big Thing (This Week)
-<!-- From goals/3-weekly.md -->
-- [ ] [Current week's main focus]
+### Wiki Domains
+- `wiki/ai/` — ИИ инструменты и воркфлоу
+- `wiki/projects/seo.md` — SEO знания
+- `wiki/projects/finance.md` — Финсоветник
+- `wiki/projects/bizaudit.md` — Аудит бизнеса
+- `wiki/people/` — Профили людей с их ЦА и тон оф войс
 
-### Hot Projects
-1. [Project name] — [status/next action]
-
-### Pipeline/Leads
-<!-- If applicable -->
-- [Lead name] — [status]
+### Инфраструктура
+- capture bot: agent-second-brain (Telegram → daily/ и wiki/)
+- query bot: claude-claw (требует донастройки под second-brain vault)
+- sync: rclone bisync VPS↔S3, rclone sync S3→PC (каждые 15 мин)
 
 ## Key People
 
-| Name | Role | Contact | Notes |
-|------|------|---------|-------|
-| [Name] | [Role] | [Telegram/Email] | [Context] |
+| Имя | Роль | Проект |
+|-----|------|--------|
+| (добавляется по мере появления) | | |
 
 ## Learnings
 
-### What Worked
-- [Pattern/approach that was successful]
-
-### What Didn't Work
-- [Anti-pattern to avoid]
+### Что работает
+- Writer модель (нарративные wiki статьи) лучше Filing Clerk для накопления знаний
 
 ### Rules to Remember
-- [Important rule discovered during work]
+- Wiki статьи пополняются, не перезаписываются
+- Тон: Wikipedia, не дневник
+- Директория по теме, не по дате
 
 ## Quick Links
 
-- [[goals/3-weekly]] — Weekly focus
-- [[goals/2-monthly]] — Monthly priorities
-- [[MOC/index]] — Maps of Content
+- [[goals/3-weekly]] — Недельный фокус
+- [[goals/2-monthly]] — Месячные приоритеты
+- [[wiki/projects/seo]] — SEO знания
+- [[wiki/projects/finance]] — Финсоветник знания
+- [[wiki/projects/bizaudit]] — Аудит знания
 
 ---
 
-*Last updated: YYYY-MM-DD*
+*Last updated: 2026-04-07*

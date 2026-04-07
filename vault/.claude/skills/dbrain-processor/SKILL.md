@@ -102,11 +102,77 @@ mcp-cli call todoist get-overview '{}'
 5. **CHECK PROCESS GOALS** — `mcp-cli call todoist find-tasks '{"labels": ["process-goal"]}'`
    → If empty or stale: generate from goals, create recurring tasks
 6. **Process entries** — Classify → task or thought, detect business mentions
-7. **Build links** — Connect notes with [[wiki-links]], link to business entities
-8. **Generate HTML report** — include process goals status + business activity
-9. **Log actions to daily** — append action log entry (see below)
-10. **Evolve MEMORY.md** — update long-term memory if needed (see below)
-11. **Capture observations** — record friction signals to handoff.md (see below)
+7. **Wiki Absorption** — для каждой мысли/инсайта: найти статью в wiki/ → дополнить (см. ниже)
+8. **Build links** — Connect notes with [[wiki-links]], link to business entities
+9. **Generate HTML report** — include process goals status + business activity
+10. **Log actions to daily** — append action log entry (see below)
+11. **Evolve MEMORY.md** — update long-term memory if needed (see below)
+12. **Capture observations** — record friction signals to handoff.md (see below)
+
+## Wiki Absorption (Step 7 Detail)
+
+**ЦЕЛЬ:** Каждая мысль или инсайт из daily — это вклад в накапливаемую wiki статью, а не новый изолированный файл.
+
+### Алгоритм
+
+```
+Для каждого entry типа [thought/idea/reflection/learning]:
+
+1. ОПРЕДЕЛИ ТЕМУ:
+   - Про ИИ инструмент? → wiki/ai/tools/{tool-name}.md
+   - Про ИИ воркфлоу? → wiki/ai/workflows/{workflow}.md
+   - Про SEO? → wiki/projects/seo.md
+   - Про финсоветника? → wiki/projects/finance.md
+   - Про аудит бизнеса? → wiki/projects/bizaudit.md
+   - Про человека? → wiki/people/{name}.md
+   - Паттерн поведения? → wiki/patterns/{pattern}.md
+   - Ценность/принцип? → wiki/beliefs/{belief}.md
+   - Общий вывод? → wiki/learnings/{topic}.md
+
+2. ПРОВЕРЬ существует ли статья:
+   - Да → дополни нарративным абзацем в нужный раздел
+   - Нет → создай статью по шаблону templates/wiki-article-template.md
+
+3. ПИШИ как Wikipedia:
+   - НЕ: "Сегодня я понял что SEO работает через..."
+   - ДА: "Эффективное SEO строится на..."
+   - Максимум 2 прямые цитаты из записей
+   - Факты и паттерны, не хроника
+
+4. ОБНОВИ frontmatter:
+   - updated: YYYY-MM-DD
+```
+
+### AI Workflows Logic
+
+Если entry упоминает **рабочий процесс** (написание документа, создание контента, анализ данных):
+- Проверь `wiki/ai/workflows/` — есть ли статья про ИИ-применение в этом процессе?
+- Нет → создай `wiki/ai/workflows/{process}.md` с рекомендацией как ИИ может помочь
+- Да → дополни статью новым инсайтом
+
+### Директории wiki/
+
+| Тема entry | Куда писать |
+|-----------|-------------|
+| Claude, GPT, Cursor, любой AI tool | `wiki/ai/tools/{tool}.md` |
+| Промпт инжиниринг, воркфлоу с ИИ | `wiki/ai/workflows/{topic}.md` |
+| SEO, контент оптимизация | `wiki/projects/seo.md` |
+| Финансовый советник, его продвижение | `wiki/projects/finance.md` |
+| Аудит бизнес-процессов | `wiki/projects/bizaudit.md` |
+| Конкретный человек (друг, родственник) | `wiki/people/{name}.md` |
+| Паттерн поведения/мышления | `wiki/patterns/{pattern}.md` |
+| Ценность, принцип, убеждение | `wiki/beliefs/{topic}.md` |
+| Общий вывод, кросс-доменный инсайт | `wiki/learnings/{topic}.md` |
+
+### В отчёте
+
+Если обновлены wiki статьи, добавь секцию:
+
+```html
+<b>📚 Wiki обновлена:</b>
+• [[wiki/ai/tools/claude]] — добавлен инсайт про промпты
+• [[wiki/projects/seo]] — новый паттерн
+```
 
 ## ОБЯЗАТЕЛЬНО: Логирование в daily/
 
@@ -383,7 +449,7 @@ business/
 ## Classification
 
 task → Todoist (see references/todoist.md)
-idea/reflection/learning → thoughts/ (see references/classification.md)
+idea/reflection/learning → wiki/ absorption (see Wiki Absorption section above)
 client/project mention → link to Business/Projects + create task if actionable
 
 ## Projects Context Integration
@@ -508,6 +574,10 @@ Output RAW HTML (no markdown, no code blocks):
 
 <b>⚠️ Требует внимания:</b>
 • {overdue or stale goals}
+
+<b>📚 Wiki обновлена:</b>
+• [[wiki/...]] — {что добавлено}
+<i>(если обновлено)</i>
 
 <b>🔗 Новые связи:</b>
 • [[Note A]] ↔ [[Note B]]

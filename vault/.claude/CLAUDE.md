@@ -54,11 +54,34 @@ Help user stay aligned with goals, capture valuable insights, and maintain clari
 |--------|---------|
 | `daily/` | Raw daily entries (YYYY-MM-DD.md) |
 | `goals/` | Goal cascade (3y → yearly → monthly → weekly) |
-| `thoughts/` | Processed notes by category |
+| `wiki/` | Personal knowledge wiki (Writer model) |
 | `MOC/` | Maps of Content indexes |
 | `attachments/` | Photos by date |
 | `business/` | Business data (CRM, network, events) |
 | `projects/` | Side projects (clients, leads) |
+
+## Wiki Structure
+
+```
+wiki/
+├── ai/
+│   ├── tools/       ← Статьи про ИИ-инструменты (Claude, GPT, Cursor...)
+│   └── workflows/   ← ИИ-воркфлоу под конкретные задачи
+├── projects/
+│   ├── seo.md       ← Доменные знания по SEO
+│   ├── finance.md   ← Продвижение финансового советника
+│   └── bizaudit.md  ← Аудит бизнес-процессов
+├── people/          ← [имя].md: профиль + ЦА + тон оф войс + история
+├── patterns/        ← Паттерны поведения и мышления
+├── beliefs/         ← Ценности, принципы
+└── learnings/       ← Кросс-доменные выводы
+```
+
+**Принципы wiki-статей:**
+- Писать как Wikipedia, не как дневник
+- Статья = накопленное понимание темы (не хроника событий)
+- Статьи живут долго и пополняются новыми данными
+- Query через claude-claw бот (имеет доступ к wiki/ через S3)
 
 ## Business Context
 
@@ -191,7 +214,7 @@ vault/.graph/report.md         # Human-readable report
 **Domains:**
 | Domain | Path | Hub |
 |--------|------|-----|
-| Personal | thoughts/, goals/, daily/ | MEMORY.md |
+| Personal | wiki/, goals/, daily/ | MEMORY.md |
 | Business | business/crm/, business/network/ | business/_index.md |
 | Projects | projects/clients/, projects/leads/ | projects/_index.md |
 
@@ -235,6 +258,12 @@ Reports use Telegram HTML:
 ## Customization
 
 For personal overrides: create `CLAUDE.local.md`
+
+## Planned Redesign
+
+**Wiki Redesign (в работе):** `.claude/docs/wiki-redesign-plan.md`
+
+Переход от Filing Clerk → Writer модели. Реализовано: `wiki/` структура создана, `thoughts/` удалена. Query через claude-claw бот. См. `.claude/docs/wiki-redesign-plan.md`.
 
 ## Learnings (from experience)
 
